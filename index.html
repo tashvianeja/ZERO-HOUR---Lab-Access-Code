@@ -210,6 +210,22 @@
   </section>
 
   <script>
+    const CORRECT_HASH = "7466ff42cb42c4aa6abe99933414b06ca30110f5f9cd25f21bc93a45cbc04370";
+
+    const successMessage = `✅ AUTHORIZATION VERIFIED
+Node-17 relay restored successfully.
+
+Authentication fragments accepted by antidote lab entrance system.
+
+🔓 LAB ACCESS GRANTED
+Proceed inside immediately. Survivors are counting on you.`;
+
+    const errorMessage = `❌ AUTHORIZATION FAILED
+Relay authentication sequence rejected.
+
+Signal instability still detected in Node-17 packet stream.
+Re-evaluate the restored packets and try again.`;
+
     const input = document.getElementById("codeInput");
     const button = document.getElementById("authBtn");
     const message = document.getElementById("message");
@@ -218,6 +234,13 @@
 
     function wait(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function sha256Hex(value) {
+      const data = new TextEncoder().encode(value);
+      const digest = await crypto.subtle.digest("SHA-256", data);
+      const bytes = Array.from(new Uint8Array(digest));
+      return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
     }
 
     async function authenticate() {
@@ -233,27 +256,25 @@
       button.disabled = true;
 
       try {
-        const [response] = await Promise.all([
-          fetch("/api/authorize", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ code: entered })
-          }),
+        if (!window.crypto || !window.crypto.subtle) {
+          throw new Error("Web Crypto API unavailable");
+        }
+
+        const [enteredHash] = await Promise.all([
+          sha256Hex(entered.toUpperCase()),
           wait(1000)
         ]);
 
-        const data = await response.json();
-        message.textContent = data.message;
+        const ok = enteredHash === CORRECT_HASH;
+        message.textContent = ok ? successMessage : errorMessage;
         message.classList.remove("ok", "err");
-        message.classList.add(data.ok ? "ok" : "err");
+        message.classList.add(ok ? "ok" : "err");
 
-        if (data.ok) {
+        if (ok) {
           input.value = "";
         }
       } catch {
-        message.textContent = "❌ AUTHORIZATION FAILED\nServer unavailable.";
+        message.textContent = "❌ AUTHORIZATION FAILED\nThis browser does not support secure hashing.";
         message.classList.remove("ok");
         message.classList.add("err");
       }
